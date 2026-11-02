@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -14,10 +15,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  static const String _backgroundImage =
+      'assets/images/login_bg.jpg';
 
   @override
   void dispose() {
@@ -27,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void login() {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState?.validate() ?? false) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -37,22 +41,46 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Displays a gradient instead of Flutter's error message
+  // if the background image cannot be loaded.
+  Widget _buildBackgroundFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF173B66),
+            Color(0xFF286A91),
+            Color(0xFF10243C),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          /// Background Image
-          SizedBox.expand(
-            child: Image.asset(
-              "assets/images/login_bg.jpg",
-              fit: BoxFit.cover,
-            ),
+          // Background image with error handling.
+          Image.asset(
+            _backgroundImage,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint(
+                'VoyageMate background image failed to load: $error',
+              );
+
+              return _buildBackgroundFallback();
+            },
           ),
 
-          /// Dark Overlay
+          // Dark overlay to keep text readable.
           Container(
-            color: Colors.black.withOpacity(0.45),
+            color: Colors.black.withValues(alpha: 0.45),
           ),
 
           SafeArea(
@@ -64,13 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
                         color: Colors.white24,
                       ),
                     ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
                           Icons.flight_takeoff,
@@ -81,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
 
                         Text(
-                          "VoyageMate",
+                          'VoyageMate',
                           style: GoogleFonts.poppins(
                             color: Colors.white,
                             fontSize: 34,
@@ -92,7 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 8),
 
                         Text(
-                          "Explore Smarter • Travel Better",
+                          'Explore Smarter • Travel Better',
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
                             color: Colors.white70,
                             fontSize: 15,
@@ -102,17 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 40),
 
                         CustomTextField(
-                          hint: "Email",
+                          hint: 'Email',
                           icon: Icons.email,
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return "Please enter your email";
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email';
                             }
 
-                            if (!value.contains("@")) {
-                              return "Enter a valid email";
+                            if (!value.contains('@') ||
+                                !value.contains('.')) {
+                              return 'Enter a valid email';
                             }
 
                             return null;
@@ -122,17 +153,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
 
                         CustomTextField(
-                          hint: "Password",
+                          hint: 'Password',
                           icon: Icons.lock,
                           obscureText: true,
                           controller: passwordController,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return "Please enter your password";
+                              return 'Please enter your password';
                             }
 
                             if (value.length < 6) {
-                              return "Password must be at least 6 characters";
+                              return 'Password must be at least 6 characters';
                             }
 
                             return null;
@@ -142,16 +173,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 30),
 
                         CustomButton(
-                          text: "Login",
+                          text: 'Login',
                           onPressed: login,
                         ),
 
                         const SizedBox(height: 20),
 
                         TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Forgot password is not implemented yet.',
+                                ),
+                              ),
+                            );
+                          },
                           child: const Text(
-                            "Forgot Password?",
+                            'Forgot Password?',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -172,13 +211,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               55,
                             ),
                           ),
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Google Sign-In is not implemented yet.',
+                                ),
+                              ),
+                            );
+                          },
                           icon: const Icon(
                             Icons.g_mobiledata,
                             size: 35,
                           ),
                           label: const Text(
-                            "Continue with Google",
+                            'Continue with Google',
                             style: TextStyle(fontSize: 16),
                           ),
                         ),
@@ -189,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
-                              "New here?",
+                              'New here?',
                               style: TextStyle(
                                 color: Colors.white,
                               ),
@@ -205,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                               child: const Text(
-                                "Create Account",
+                                'Create Account',
                                 style: TextStyle(
                                   color: Colors.amber,
                                   fontWeight: FontWeight.bold,

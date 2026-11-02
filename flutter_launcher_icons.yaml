@@ -1,0 +1,6 @@
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icon/voyagemate_icon.png"
+  adaptive_icon_background: "#063A91"
+  adaptive_icon_foreground: "assets/icon/voyagemate_icon_foreground.png"
+  min_sdk_android: 21
