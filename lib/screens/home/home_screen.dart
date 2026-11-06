@@ -6,6 +6,7 @@ import '../profile/profile_screen.dart';
 import '../packing/packing_screen.dart';
 import '../destinations/destinations_screen.dart';
 import '../maps/maps_screen.dart';
+import '../weather/weather_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -447,7 +448,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   subtitle: 'Check forecast',
                   color: Colors.purple,
                   onTap: () {
-                    _showComingSoon('Weather');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WeatherScreen(),
+                      ),
+                    );
                   },
                 ),
               ],

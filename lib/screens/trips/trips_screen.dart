@@ -140,7 +140,7 @@ class _TripsScreenState extends State<TripsScreen> {
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
+            color: Colors.grey.withValues(alpha: 0.15),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -171,7 +171,7 @@ class _TripsScreenState extends State<TripsScreen> {
                   top: 20,
                   child: Icon(
                     trip['icon'],
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     size: 70,
                   ),
                 ),
