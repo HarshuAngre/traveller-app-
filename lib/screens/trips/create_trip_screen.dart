@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models/trip.dart';
+
 class CreateTripScreen extends StatefulWidget {
-  const CreateTripScreen({super.key});
+  const CreateTripScreen({super.key, this.trip});
+
+  final Trip? trip;
 
   @override
   State<CreateTripScreen> createState() => _CreateTripScreenState();
@@ -10,123 +14,119 @@ class CreateTripScreen extends StatefulWidget {
 class _CreateTripScreenState extends State<CreateTripScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController destinationController =
-      TextEditingController();
-
-  final TextEditingController budgetController =
-      TextEditingController();
-
-  final TextEditingController notesController =
-      TextEditingController();
+  late final TextEditingController destinationController;
+  late final TextEditingController countryController;
+  late final TextEditingController budgetController;
+  late final TextEditingController notesController;
 
   DateTime? startDate;
   DateTime? endDate;
 
+  bool get _isEditing => widget.trip != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final trip = widget.trip;
+    destinationController = TextEditingController(
+      text: trip?.destination ?? '',
+    );
+    countryController = TextEditingController(text: trip?.country ?? '');
+    budgetController = TextEditingController(
+      text: trip == null ? '' : _budgetInput(trip.budgetAmount),
+    );
+    notesController = TextEditingController(text: trip?.description ?? '');
+    startDate = trip?.startDate;
+    endDate = trip?.endDate;
+  }
+
+  String _budgetInput(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2);
+
   @override
   void dispose() {
     destinationController.dispose();
+    countryController.dispose();
     budgetController.dispose();
     notesController.dispose();
     super.dispose();
   }
 
   Future<void> selectStartDate() async {
-    final DateTime? selectedDate = await showDatePicker(
+    final now = DateTime.now();
+    final selectedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: startDate ?? now,
+      firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
 
-    if (selectedDate != null) {
-      setState(() {
-        startDate = selectedDate;
-
-        if (endDate != null && endDate!.isBefore(selectedDate)) {
-          endDate = null;
-        }
-      });
-    }
+    if (selectedDate == null) return;
+    setState(() {
+      startDate = selectedDate;
+      if (endDate != null && endDate!.isBefore(selectedDate)) {
+        endDate = null;
+      }
+    });
   }
 
   Future<void> selectEndDate() async {
     if (startDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select the start date first.'),
-        ),
-      );
+      _showMessage('Please select the start date first.');
       return;
     }
 
-    final DateTime? selectedDate = await showDatePicker(
+    final selectedDate = await showDatePicker(
       context: context,
-      initialDate: startDate!,
+      initialDate: endDate ?? startDate!,
       firstDate: startDate!,
       lastDate: DateTime(2100),
     );
 
     if (selectedDate != null) {
-      setState(() {
-        endDate = selectedDate;
-      });
+      setState(() => endDate = selectedDate);
     }
   }
 
-  String formatDate(DateTime? date) {
-    if (date == null) {
-      return 'Select date';
-    }
+  String formatDate(DateTime? date) =>
+      date == null ? 'Select date' : Trip.formatDate(date);
 
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
-        '${date.year}';
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void createTrip() {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  void _saveTrip() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     if (startDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a start date.'),
-        ),
-      );
+      _showMessage('Please select a start date.');
       return;
     }
-
     if (endDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an end date.'),
-        ),
-      );
+      _showMessage('Please select an end date.');
+      return;
+    }
+    if (endDate!.isBefore(startDate!)) {
+      _showMessage('End date cannot be before the start date.');
       return;
     }
 
-    final trip = {
+    final budget = double.tryParse(budgetController.text.trim());
+    if (budget == null || budget <= 0) {
+      _showMessage('Please enter a valid budget.');
+      return;
+    }
+
+    Navigator.pop<Map<String, dynamic>>(context, {
       'destination': destinationController.text.trim(),
-      'budget': budgetController.text.trim(),
-      'startDate': formatDate(startDate),
-      'endDate': formatDate(endDate),
+      'country': countryController.text.trim(),
+      'budget': budget,
+      'startDate': startDate!,
+      'endDate': endDate!,
       'notes': notesController.text.trim(),
-    };
-
-    debugPrint('Created Trip: $trip');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Trip created successfully! 🎉'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        Navigator.pop(context, trip);
-      }
     });
   }
 
@@ -134,23 +134,19 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'Create Trip',
-          style: TextStyle(
+        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text(
+          _isEditing ? 'Edit Trip' : 'Create Trip',
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 23,
             fontWeight: FontWeight.bold,
           ),
         ),
-        iconTheme: const IconThemeData(
-          color: Colors.black,
-        ),
       ),
-
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -158,42 +154,42 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF1565C0),
-                      Color(0xFF42A5F5),
-                    ],
+                    colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(25),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.flight_takeoff,
                       color: Colors.white,
                       size: 45,
                     ),
-                    SizedBox(height: 15),
+                    const SizedBox(height: 15),
                     Text(
-                      'Plan Your Next Adventure',
-                      style: TextStyle(
+                      _isEditing
+                          ? 'Update Your Adventure'
+                          : 'Plan Your Next Adventure',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
-                      'Add the details of your upcoming trip.',
-                      style: TextStyle(
+                      _isEditing
+                          ? 'Update the details of your trip.'
+                          : 'Add the details of your upcoming trip.',
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
                       ),
@@ -201,67 +197,46 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
               const Text(
                 'Destination',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: destinationController,
                 textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Goa, Manali, Dubai',
-                  prefixIcon: const Icon(
-                    Icons.location_on,
-                    color: Color(0xFF1565C0),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF1565C0),
-                      width: 2,
-                    ),
-                  ),
+                decoration: _inputDecoration(
+                  'e.g. Goa, Manali, Dubai',
+                  Icons.location_on,
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a destination';
+                  if (value == null || value.trim().length < 2) {
+                    return 'Please enter a valid destination';
                   }
-
-                  if (value.trim().length < 2) {
-                    return 'Enter a valid destination';
-                  }
-
                   return null;
                 },
               ),
-
-              const SizedBox(height: 25),
-
+              const SizedBox(height: 20),
               const Text(
-                'Travel Dates',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                'Country / Region',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: countryController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDecoration(
+                  'e.g. India, UAE, Thailand',
+                  Icons.public,
                 ),
               ),
-
+              const SizedBox(height: 25),
+              const Text(
+                'Travel Dates',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
-
               Row(
                 children: [
                   Expanded(
@@ -272,9 +247,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                       onTap: selectStartDate,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   Expanded(
                     child: _dateCard(
                       title: 'End Date',
@@ -285,111 +258,54 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 25),
-
               const Text(
                 'Budget',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: budgetController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Enter your budget',
-                  prefixIcon: const Icon(
-                    Icons.currency_rupee,
-                    color: Colors.green,
-                  ),
-                  prefixText: '₹ ',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF1565C0),
-                      width: 2,
-                    ),
-                  ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
+                decoration: _inputDecoration(
+                  'Enter your budget',
+                  Icons.currency_rupee,
+                ).copyWith(prefixText: '₹ '),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your budget';
-                  }
-
-                  final budget = double.tryParse(value);
-
-                  if (budget == null || budget <= 0) {
+                  final amount = double.tryParse(value?.trim() ?? '');
+                  if (amount == null || amount <= 0) {
                     return 'Enter a valid budget';
                   }
-
                   return null;
                 },
               ),
-
               const SizedBox(height: 25),
-
               const Text(
                 'Notes',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: notesController,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: 'Add notes about your trip...',
-                  alignLabelWithHint: true,
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 55),
-                    child: Icon(
-                      Icons.notes,
-                      color: Color(0xFF1565C0),
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF1565C0),
-                      width: 2,
-                    ),
-                  ),
-                ),
+                decoration: _inputDecoration(
+                  'Add notes about your trip...',
+                  Icons.notes,
+                ).copyWith(alignLabelWithHint: true),
               ),
-
               const SizedBox(height: 35),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton.icon(
-                  onPressed: createTrip,
-                  icon: const Icon(Icons.add),
-                  label: const Text(
-                    'Create Trip',
-                    style: TextStyle(
+                  onPressed: _saveTrip,
+                  icon: Icon(_isEditing ? Icons.save : Icons.add),
+                  label: Text(
+                    _isEditing ? 'Save Changes' : 'Create Trip',
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                     ),
@@ -411,6 +327,23 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     );
   }
 
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon, color: const Color(0xFF1565C0)),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+      ),
+    );
+  }
+
   Widget _dateCard({
     required String title,
     required String date,
@@ -425,37 +358,20 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.transparent,
-          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              color: const Color(0xFF1565C0),
-              size: 25,
-            ),
-
+            Icon(icon, color: const Color(0xFF1565C0), size: 25),
             const SizedBox(height: 12),
-
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
-
             const SizedBox(height: 5),
-
             Text(
               date,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ],
         ),

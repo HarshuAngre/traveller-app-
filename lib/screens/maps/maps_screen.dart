@@ -1,13 +1,12 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_places_sdk_plus/google_places_sdk_plus.dart'
-    as places;
+import 'package:google_navigation_flutter/google_navigation_flutter.dart' as nav;
+import 'package:google_places_sdk_plus/google_places_sdk_plus.dart' as places;
 
 import '../../core/config/google_maps_config.dart';
+import '../navigation/navigation_screen.dart';
 
 class MapsScreen extends StatefulWidget {
   const MapsScreen({super.key});
@@ -17,7 +16,7 @@ class MapsScreen extends StatefulWidget {
 }
 
 class _MapsScreenState extends State<MapsScreen> {
-  GoogleMapController? mapController;
+  nav.GoogleMapViewController? mapController;
   places.FlutterGooglePlacesSdk? _placesClient;
 
   bool _isLocating = false;
@@ -29,29 +28,18 @@ class _MapsScreenState extends State<MapsScreen> {
   String _selectedPlaceName = 'Goa';
   String _selectedPlaceAddress = 'Popular destination';
 
-  LatLng _selectedPlacePosition = const LatLng(
-    15.4909,
-    73.8278,
+  nav.LatLng _selectedPlacePosition = const nav.LatLng(
+    latitude: 15.4909,
+    longitude: 73.8278,
   );
 
   static const Color primaryBlue = Color(0xFF1565C0);
   static const Color backgroundColor = Color(0xFFF5F7FA);
 
-  static const LatLng defaultLocation = LatLng(
-    15.4909,
-    73.8278,
+  static const nav.LatLng defaultLocation = nav.LatLng(
+    latitude: 15.4909,
+    longitude: 73.8278,
   );
-
-  Set<Marker> markers = {
-    const Marker(
-      markerId: MarkerId('goa'),
-      position: defaultLocation,
-      infoWindow: InfoWindow(
-        title: 'Goa',
-        snippet: 'Popular travel destination',
-      ),
-    ),
-  };
 
   @override
   void initState() {
@@ -84,7 +72,6 @@ class _MapsScreenState extends State<MapsScreen> {
         apiKey,
         locale: const Locale('en', 'IN'),
       );
-
       debugPrint('Google Places client created.');
     } catch (error) {
       debugPrint('Google Places initialization error: $error');
@@ -92,22 +79,36 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   // --------------------------------------------------
-  // MAP INITIALIZATION
+  // MAP INITIALIZATION (GOOGLE NAVIGATION SDK MAP VIEW)
   // --------------------------------------------------
 
-  void onMapCreated(GoogleMapController controller) {
+  void _onMapCreated(nav.GoogleMapViewController controller) {
     mapController = controller;
+    unawaited(_initializeMapView());
+  }
 
-    if (_selectedPlacePosition != defaultLocation) {
-      _moveCameraTo(_selectedPlacePosition);
+  Future<void> _initializeMapView() async {
+    final controller = mapController;
+    if (controller == null) return;
+
+    try {
+      await _replaceSelectedPlaceMarker();
+      if (_hasLocationPermission) {
+        await controller.setMyLocationEnabled(true);
+      }
+    } catch (error) {
+      debugPrint('Map initialization error: $error');
     }
   }
 
-  Future<void> _moveCameraTo(LatLng location) async {
+  Future<void> _moveCameraTo(nav.LatLng location) async {
+    final controller = mapController;
+    if (controller == null) return;
+
     try {
-      await mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
+      await controller.animateCamera(
+        nav.CameraUpdate.newCameraPosition(
+          nav.CameraPosition(
             target: location,
             zoom: 16,
           ),
@@ -116,6 +117,22 @@ class _MapsScreenState extends State<MapsScreen> {
     } catch (error) {
       debugPrint('Camera movement error: $error');
     }
+  }
+
+  Future<void> _replaceSelectedPlaceMarker() async {
+    final controller = mapController;
+    if (controller == null) return;
+
+    await controller.clearMarkers();
+    await controller.addMarkers([
+      nav.MarkerOptions(
+        position: _selectedPlacePosition,
+        infoWindow: nav.InfoWindow(
+          title: _selectedPlaceName,
+          snippet: _selectedPlaceAddress,
+        ),
+      ),
+    ]);
   }
 
   // --------------------------------------------------
@@ -161,15 +178,13 @@ class _MapsScreenState extends State<MapsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                Geolocator.openLocationSettings();
+                unawaited(Geolocator.openLocationSettings());
               },
               child: const Text('Enable Location'),
             ),
@@ -198,15 +213,13 @@ class _MapsScreenState extends State<MapsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                Geolocator.openAppSettings();
+                unawaited(Geolocator.openAppSettings());
               },
               child: const Text('Open Settings'),
             ),
@@ -236,8 +249,7 @@ class _MapsScreenState extends State<MapsScreen> {
         return;
       }
 
-      LocationPermission permission =
-          await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -268,8 +280,7 @@ class _MapsScreenState extends State<MapsScreen> {
         _hasLocationPermission = true;
       });
 
-      final Position position =
-          await Geolocator.getCurrentPosition(
+      final Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 20),
@@ -280,19 +291,23 @@ class _MapsScreenState extends State<MapsScreen> {
 
       _currentPosition = position;
 
-      final LatLng currentLocation = LatLng(
-        position.latitude,
-        position.longitude,
+      final nav.LatLng currentLocation = nav.LatLng(
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
 
-      await mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: currentLocation,
-            zoom: 16,
+      final controller = mapController;
+      if (controller != null) {
+        await controller.setMyLocationEnabled(true);
+        await controller.animateCamera(
+          nav.CameraUpdate.newCameraPosition(
+            nav.CameraPosition(
+              target: currentLocation,
+              zoom: 16,
+            ),
           ),
-        ),
-      );
+        );
+      }
 
       _showMessage('Your current location is displayed.');
     } on TimeoutException {
@@ -301,7 +316,6 @@ class _MapsScreenState extends State<MapsScreen> {
       );
     } catch (error) {
       debugPrint('Current location error: $error');
-
       _showMessage(
         'Unable to find your location. Please try again.',
       );
@@ -376,7 +390,6 @@ class _MapsScreenState extends State<MapsScreen> {
     });
 
     try {
-      // Request only the fields required by this screen.
       final response = await client.fetchPlace(
         placeId,
         fields: const [
@@ -395,9 +408,9 @@ class _MapsScreenState extends State<MapsScreen> {
         );
       }
 
-      final LatLng selectedLocation = LatLng(
-        placeLocation.lat,
-        placeLocation.lng,
+      final nav.LatLng selectedLocation = nav.LatLng(
+        latitude: placeLocation.lat,
+        longitude: placeLocation.lng,
       );
 
       final String selectedName =
@@ -416,25 +429,14 @@ class _MapsScreenState extends State<MapsScreen> {
         _selectedPlaceName = selectedName;
         _selectedPlaceAddress = selectedAddress;
         _selectedPlacePosition = selectedLocation;
-
-        markers = {
-          Marker(
-            markerId: const MarkerId('selected_place'),
-            position: selectedLocation,
-            infoWindow: InfoWindow(
-              title: selectedName,
-              snippet: selectedAddress,
-            ),
-          ),
-        };
       });
 
+      await _replaceSelectedPlaceMarker();
       await _moveCameraTo(selectedLocation);
 
       _showMessage('$selectedName selected on the map.');
     } catch (error) {
       debugPrint('Place details error: $error');
-
       _showMessage(
         'Unable to load this place. Please try another result.',
       );
@@ -448,6 +450,22 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   // --------------------------------------------------
+  // OPEN ROUTE PREVIEW / NAVIGATION
+  // --------------------------------------------------
+
+  void _openNavigation() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NavigationScreen(
+          destinationName: _selectedPlaceName,
+          destinationAddress: _selectedPlaceAddress,
+          destinationPosition: _selectedPlacePosition,
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------
   // BUILD SCREEN
   // --------------------------------------------------
 
@@ -455,7 +473,6 @@ class _MapsScreenState extends State<MapsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
-
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -481,41 +498,23 @@ class _MapsScreenState extends State<MapsScreen> {
           ),
         ],
       ),
-
       body: Stack(
         children: [
-
-          // --------------------------------------------------
-          // GOOGLE MAP
-          // --------------------------------------------------
-
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
+          // Google Navigation SDK's regular map view.
+          // This is a map-only view; it does not start turn-by-turn guidance.
+          nav.GoogleMapsMapView(
+            initialCameraPosition: const nav.CameraPosition(
               target: defaultLocation,
               zoom: 11,
             ),
-
-            onMapCreated: onMapCreated,
-
-            markers: markers,
-
-            myLocationEnabled: _hasLocationPermission,
-
-            myLocationButtonEnabled: false,
-
-            zoomControlsEnabled: false,
-
-            mapToolbarEnabled: false,
-
-            compassEnabled: true,
-
-            mapType: MapType.normal,
+            onViewCreated: _onMapCreated,
+            initialMapType: nav.MapType.normal,
+            initialCompassEnabled: true,
+            initialMapToolbarEnabled: false,
+            initialZoomControlsEnabled: false,
           ),
 
-          // --------------------------------------------------
           // SEARCH BAR
-          // --------------------------------------------------
-
           Positioned(
             top: 15,
             left: 20,
@@ -544,9 +543,7 @@ class _MapsScreenState extends State<MapsScreen> {
                       Icons.search,
                       color: primaryBlue,
                     ),
-
                     const SizedBox(width: 12),
-
                     const Expanded(
                       child: Text(
                         'Search places, landmarks, restaurants...',
@@ -558,7 +555,6 @@ class _MapsScreenState extends State<MapsScreen> {
                         ),
                       ),
                     ),
-
                     if (_isLoadingPlace)
                       const SizedBox(
                         height: 19,
@@ -574,10 +570,7 @@ class _MapsScreenState extends State<MapsScreen> {
             ),
           ),
 
-          // --------------------------------------------------
           // SELECTED PLACE INFORMATION CARD
-          // --------------------------------------------------
-
           Positioned(
             left: 20,
             right: 20,
@@ -597,7 +590,6 @@ class _MapsScreenState extends State<MapsScreen> {
               ),
               child: Row(
                 children: [
-
                   const CircleAvatar(
                     radius: 25,
                     backgroundColor: Color(0xFFE3F2FD),
@@ -606,9 +598,7 @@ class _MapsScreenState extends State<MapsScreen> {
                       color: primaryBlue,
                     ),
                   ),
-
                   const SizedBox(width: 14),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -622,9 +612,7 @@ class _MapsScreenState extends State<MapsScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 4),
-
                         Text(
                           _selectedPlaceAddress,
                           maxLines: 2,
@@ -637,38 +625,43 @@ class _MapsScreenState extends State<MapsScreen> {
                       ],
                     ),
                   ),
-
-                  IconButton(
-                    tooltip: 'Show selected place',
-                    onPressed: moveToSelectedPlace,
-                    icon: const Icon(
-                      Icons.near_me,
-                      color: primaryBlue,
-                      size: 27,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Show selected place',
+                        onPressed: moveToSelectedPlace,
+                        icon: const Icon(
+                          Icons.near_me,
+                          color: primaryBlue,
+                          size: 25,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Get directions',
+                        onPressed: _openNavigation,
+                        icon: const Icon(
+                          Icons.directions_rounded,
+                          color: primaryBlue,
+                          size: 28,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
 
-          // --------------------------------------------------
           // CURRENT LOCATION BUTTON
-          // --------------------------------------------------
-
           Positioned(
             right: 20,
             bottom: 125,
             child: FloatingActionButton(
               heroTag: 'locationButton',
-
-              onPressed: _isLocating
-                  ? null
-                  : _goToCurrentLocation,
-
+              onPressed: _isLocating ? null : _goToCurrentLocation,
               backgroundColor: Colors.white,
               foregroundColor: primaryBlue,
-
               child: _isLocating
                   ? const SizedBox(
                       height: 23,
@@ -678,9 +671,7 @@ class _MapsScreenState extends State<MapsScreen> {
                         color: primaryBlue,
                       ),
                     )
-                  : const Icon(
-                      Icons.my_location,
-                    ),
+                  : const Icon(Icons.my_location),
             ),
           ),
         ],
@@ -703,8 +694,7 @@ class _PlaceSearchSheet extends StatefulWidget {
   });
 
   @override
-  State<_PlaceSearchSheet> createState() =>
-      _PlaceSearchSheetState();
+  State<_PlaceSearchSheet> createState() => _PlaceSearchSheetState();
 }
 
 class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
@@ -740,6 +730,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
     final query = value.trim();
 
     if (query.length < 2) {
+      _requestNumber++;
       setState(() {
         _predictions = [];
         _isSearching = false;
@@ -748,6 +739,10 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       });
       return;
     }
+
+    setState(() {
+      _errorMessage = null;
+    });
 
     _debounce = Timer(
       const Duration(milliseconds: 400),
@@ -779,8 +774,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               lng: position.longitude,
             );
 
-      final response =
-          await widget.client.findAutocompletePredictions(
+      final response = await widget.client.findAutocompletePredictions(
         query,
         origin: origin,
         newSessionToken: _startNewSession,
@@ -815,9 +809,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
   // SELECT A SEARCH RESULT
   // --------------------------------------------------
 
-  void _selectPrediction(
-    places.AutocompletePrediction prediction,
-  ) {
+  void _selectPrediction(places.AutocompletePrediction prediction) {
     _debounce?.cancel();
     Navigator.of(context).pop(prediction);
   }
@@ -834,9 +826,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       ),
       child: Column(
         children: [
-
           const SizedBox(height: 12),
-
           // Drag handle
           Container(
             width: 42,
@@ -846,7 +836,6 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Row(
@@ -860,7 +849,6 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
                     ),
                   ),
                 ),
-
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
@@ -868,7 +856,6 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               ],
             ),
           ),
-
           // Search input
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -879,7 +866,6 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               onChanged: _onSearchChanged,
               onSubmitted: (value) {
                 _debounce?.cancel();
-
                 if (value.trim().length >= 2) {
                   _searchPlaces(value.trim());
                 }
@@ -911,20 +897,16 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           if (_isSearching)
             const LinearProgressIndicator(
               minHeight: 2,
               color: Color(0xFF1565C0),
             ),
-
           // Search results
           Expanded(
             child: _buildSearchResults(),
           ),
-
           // Google attribution
           Padding(
             padding: const EdgeInsets.only(
@@ -932,8 +914,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
               top: 8,
             ),
             child: Image(
-              image: places.FlutterGooglePlacesSdk
-                  .assetPoweredByGoogleOnWhite,
+              image: places.FlutterGooglePlacesSdk.assetPoweredByGoogleOnWhite,
               height: 18,
               fit: BoxFit.contain,
             ),

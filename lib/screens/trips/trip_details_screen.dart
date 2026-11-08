@@ -1,42 +1,20 @@
 import 'package:flutter/material.dart';
 
-class TripDetailsScreen extends StatelessWidget {
-  final Map<String, dynamic> trip;
+import '../../core/models/trip.dart';
 
-  const TripDetailsScreen({
-    super.key,
-    required this.trip,
-  });
+class TripDetailsScreen extends StatelessWidget {
+  const TripDetailsScreen({super.key, required this.trip});
+
+  final Trip trip;
 
   @override
   Widget build(BuildContext context) {
-    final String destination =
-        trip['destination']?.toString() ?? 'Unknown Destination';
-
-    final String country =
-        trip['country']?.toString() ?? 'Unknown';
-
-    final String startDate =
-        trip['startDate']?.toString() ?? 'Not selected';
-
-    final String endDate =
-        trip['endDate']?.toString() ?? 'Not selected';
-
-    final String budget =
-        trip['budget']?.toString() ?? '₹0';
-
-    final String notes =
-        trip['notes']?.toString() ?? 'No notes added.';
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(
-          color: Colors.black,
-        ),
+        iconTheme: const IconThemeData(color: Colors.black),
         title: const Text(
           'Trip Details',
           style: TextStyle(
@@ -47,37 +25,23 @@ class TripDetailsScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Edit Trip feature coming soon!',
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(
-              Icons.edit,
-            ),
+            tooltip: 'Edit trip',
+            onPressed: () => Navigator.pop(context, 'edit'),
+            icon: const Icon(Icons.edit, color: Colors.black),
           ),
         ],
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Destination Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF1565C0),
-                    Color(0xFF42A5F5),
-                  ],
+                  colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -91,74 +55,66 @@ class TripDetailsScreen extends StatelessWidget {
                     color: Colors.white,
                     size: 55,
                   ),
-
                   const SizedBox(height: 20),
-
                   Text(
-                    destination,
+                    trip.destination,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 5),
-
                   Text(
-                    country,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
+                    trip.countryLabel,
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _statusLabel(trip.status),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
             const Text(
               'Trip Information',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 15),
-
-            // Dates
             _buildInfoCard(
               icon: Icons.calendar_month,
               iconColor: Colors.blue,
               title: 'Travel Dates',
-              value: '$startDate - $endDate',
+              value: trip.dateRange,
             ),
-
             const SizedBox(height: 12),
-
-            // Budget
             _buildInfoCard(
               icon: Icons.account_balance_wallet,
               iconColor: Colors.green,
               title: 'Trip Budget',
-              value: budget,
+              value: trip.formattedBudget,
             ),
-
             const SizedBox(height: 25),
-
-            // Notes
             const Text(
               'Trip Notes',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 15),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -169,17 +125,11 @@ class TripDetailsScreen extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.notes,
-                    color: Color(0xFF1565C0),
-                    size: 25,
-                  ),
-
+                  const Icon(Icons.notes, color: Color(0xFF1565C0), size: 25),
                   const SizedBox(width: 15),
-
                   Expanded(
                     child: Text(
-                      notes,
+                      trip.notesLabel,
                       style: const TextStyle(
                         fontSize: 15,
                         height: 1.5,
@@ -190,22 +140,14 @@ class TripDetailsScreen extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
-            // Map
             const Text(
               'Location',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 15),
-
             Container(
-              height: 180,
+              height: 150,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: const Color(0xFFE3F2FD),
@@ -215,57 +157,36 @@ class TripDetailsScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    Icons.map,
+                    Icons.location_on,
                     color: Color(0xFF1565C0),
-                    size: 55,
+                    size: 48,
                   ),
-
-                  const SizedBox(height: 12),
-
+                  const SizedBox(height: 10),
                   Text(
-                    destination,
+                    trip.destination,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 5),
-
-                  const Text(
-                    'Google Maps integration coming soon',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
+                  Text(
+                    trip.countryLabel,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 30),
-
-            // Edit button
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Edit Trip feature coming soon!',
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () => Navigator.pop(context, 'edit'),
                 icon: const Icon(Icons.edit),
                 label: const Text(
                   'Edit Trip',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
@@ -276,21 +197,13 @@ class TripDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Delete button
             SizedBox(
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  _showDeleteDialog(context);
-                },
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.red,
-                ),
+                onPressed: () => _showDeleteDialog(context),
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
                 label: const Text(
                   'Delete Trip',
                   style: TextStyle(
@@ -300,9 +213,7 @@ class TripDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(
-                    color: Colors.red,
-                  ),
+                  side: const BorderSide(color: Colors.red),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(17),
                   ),
@@ -313,6 +224,19 @@ class TripDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'ongoing':
+        return 'Ongoing';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Planned';
+    }
   }
 
   Widget _buildInfoCard({
@@ -333,28 +257,18 @@ class TripDetailsScreen extends StatelessWidget {
           CircleAvatar(
             radius: 25,
             backgroundColor: iconColor.withValues(alpha: 0.12),
-            child: Icon(
-              icon,
-              color: iconColor,
-            ),
+            child: Icon(icon, color: iconColor),
           ),
-
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
                 ),
-
                 const SizedBox(height: 5),
-
                 Text(
                   value,
                   style: const TextStyle(
@@ -370,55 +284,29 @@ class TripDetailsScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context) {
-    showDialog(
+  Future<void> _showDeleteDialog(BuildContext context) async {
+    final shouldDelete = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text(
-            'Delete Trip?',
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Trip?'),
+        content: const Text(
+          'Are you sure you want to delete this trip? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
-          content: const Text(
-            'Are you sure you want to delete this trip? '
-            'This action cannot be undone.',
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text(
-                'Cancel',
-              ),
-            ),
-
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-
-                Navigator.pop(
-                  context,
-                  true,
-                );
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Trip deleted successfully.',
-                    ),
-                  ),
-                );
-              },
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                  color: Colors.red,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
+
+    if (shouldDelete == true && context.mounted) {
+      Navigator.pop(context, 'delete');
+    }
   }
 }

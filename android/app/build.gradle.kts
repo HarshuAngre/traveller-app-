@@ -3,11 +3,20 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+    
 }
+project.configurations
+    .matching { it.name.endsWith("RuntimeClasspath") }
+    .configureEach {
+        exclude(
+            group = "com.google.android.gms",
+            module = "play-services-maps"
+        )
+    }
 
 android {
     namespace = "com.example.travel_companion"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

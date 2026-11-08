@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/login_screen.dart';
+import '../home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,18 +14,35 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _splashTimer;
+
   @override
   void initState() {
     super.initState();
 
-    Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-        ),
-      );
-    });
+    _splashTimer = Timer(const Duration(seconds: 3), _checkAuthentication);
+  }
+
+  void _checkAuthentication() {
+    if (!mounted) return;
+
+    // Retrieve the session restored by Supabase during app startup.
+    final session = Supabase.instance.client.auth.currentSession;
+
+    // A saved session means the user is already authenticated.
+    final Widget destination = session != null
+        ? const HomeScreen()
+        : const LoginScreen();
+
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => destination));
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -33,10 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
         width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF1565C0),
-              Color(0xFF42A5F5),
-            ],
+            colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -54,10 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white30,
-                    width: 2,
-                  ),
+                  border: Border.all(color: Colors.white30, width: 2),
                 ),
                 child: const Icon(
                   Icons.flight_takeoff,
@@ -92,18 +105,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
               const Spacer(),
 
-              const CircularProgressIndicator(
-                color: Colors.white,
-              ),
+              const CircularProgressIndicator(color: Colors.white),
 
               const SizedBox(height: 20),
 
-              const Text(
-                "Loading...",
-                style: TextStyle(
-                  color: Colors.white70,
-                ),
-              ),
+              const Text("Loading...", style: TextStyle(color: Colors.white70)),
 
               const SizedBox(height: 40),
             ],
