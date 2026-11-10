@@ -41,6 +41,10 @@ dependencies:
   google_places_sdk_plus: ^1.1.0
   google_navigation_flutter: ^0.12.0
   supabase_flutter: 2.18.3
+  image_picker: ^1.2.4
+  flutter_local_notifications: 21.0.0
+  flutter_timezone: 5.1.1
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:

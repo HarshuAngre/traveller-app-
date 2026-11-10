@@ -9,7 +9,10 @@ import '../../core/config/google_maps_config.dart';
 import '../navigation/navigation_screen.dart';
 
 class MapsScreen extends StatefulWidget {
-  const MapsScreen({super.key});
+  const MapsScreen({super.key, this.initialPlaceQuery});
+
+  /// When supplied, MapsScreen searches for this destination after the map loads.
+  final String? initialPlaceQuery;
 
   @override
   State<MapsScreen> createState() => _MapsScreenState();
@@ -22,6 +25,7 @@ class _MapsScreenState extends State<MapsScreen> {
   bool _isLocating = false;
   bool _hasLocationPermission = false;
   bool _isLoadingPlace = false;
+  bool _initialPlaceQueryHandled = false;
 
   Position? _currentPosition;
 
@@ -95,6 +99,16 @@ class _MapsScreenState extends State<MapsScreen> {
       await _replaceSelectedPlaceMarker();
       if (_hasLocationPermission) {
         await controller.setMyLocationEnabled(true);
+      }
+
+      // Destination Explorer can open this screen with a selected place.
+      // Resolve it using the same Places SDK already used by map search.
+      if (!_initialPlaceQueryHandled) {
+        _initialPlaceQueryHandled = true;
+        final query = widget.initialPlaceQuery?.trim();
+        if (query != null && query.isNotEmpty) {
+          await _searchInitialPlace(query);
+        }
       }
     } catch (error) {
       debugPrint('Map initialization error: $error');
@@ -371,12 +385,49 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   // --------------------------------------------------
+  // OPEN A DESTINATION FROM DESTINATION EXPLORER
+  // --------------------------------------------------
+
+  Future<void> _searchInitialPlace(String query) async {
+    final client = _placesClient;
+
+    if (client == null) {
+      _showMessage(
+        'Places is not configured. Check your API key and run configuration.',
+      );
+      return;
+    }
+
+    try {
+      final response = await client.findAutocompletePredictions(
+        query,
+        newSessionToken: true,
+      );
+
+      if (!mounted) return;
+
+      if (response.predictions.isEmpty) {
+        _showMessage(
+          'No map result found for "$query". Try searching manually.',
+        );
+        return;
+      }
+
+      await _selectPlace(response.predictions.first, showMessage: false);
+    } catch (error) {
+      debugPrint('Initial destination search error: $error');
+      _showMessage('Could not find this destination. Try using map search.');
+    }
+  }
+
+  // --------------------------------------------------
   // FETCH SELECTED PLACE DETAILS
   // --------------------------------------------------
 
   Future<void> _selectPlace(
-    places.AutocompletePrediction prediction,
-  ) async {
+    places.AutocompletePrediction prediction, {
+    bool showMessage = true,
+  }) async {
     final client = _placesClient;
     final placeId = prediction.placeId;
 
@@ -434,7 +485,9 @@ class _MapsScreenState extends State<MapsScreen> {
       await _replaceSelectedPlaceMarker();
       await _moveCameraTo(selectedLocation);
 
-      _showMessage('$selectedName selected on the map.');
+      if (showMessage) {
+        _showMessage('$selectedName selected on the map.');
+      }
     } catch (error) {
       debugPrint('Place details error: $error');
       _showMessage(

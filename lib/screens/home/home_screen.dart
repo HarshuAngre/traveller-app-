@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/profile_service.dart';
+import '../../core/services/trip_notification_service.dart';
+
 import '../trips/trips_screen.dart';
 import '../budget/budget_screen.dart';
 import '../profile/profile_screen.dart';
@@ -16,15 +19,62 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+  final ProfileService _profileService = ProfileService();
 
-  void _openTrips() {
-    Navigator.push(
+  int _currentIndex = 0;
+  String _dashboardName = 'Traveler';
+  int _tripCount = 0;
+  int _placeCount = 0;
+  int _countryCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    try {
+      final data = await _profileService.fetchDashboardData();
+      if (!mounted) return;
+      setState(() {
+        _dashboardName = data['full_name']?.toString() ?? 'Traveler';
+        _tripCount = data['trips'] as int? ?? 0;
+        _placeCount = data['places'] as int? ?? 0;
+        _countryCount = data['countries'] as int? ?? 0;
+      });
+
+      try {
+        await TripNotificationService.instance.syncIfEnabled();
+      } catch (notificationError) {
+        debugPrint('Trip reminder refresh error: $notificationError');
+      }
+    } catch (error) {
+      debugPrint('Dashboard profile refresh error: $error');
+    }
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
+        builder: (context) => const ProfileScreen(),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _currentIndex = 0);
+    await _loadDashboard();
+  }
+
+  Future<void> _openTrips() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
         builder: (context) => const TripsScreen(),
       ),
     );
+    if (!mounted) return;
+    await _loadDashboard();
   }
 
   void _showComingSoon(String feature) {
@@ -59,13 +109,8 @@ class _HomeScreenState extends State<HomeScreen> {
   break;
 
       case 3:
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const ProfileScreen(),
-    ),
-  );
-  break;
+        _openProfile();
+        break;
     }
   }
 
@@ -98,14 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 15),
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
-                );
-              },
+              onTap: _openProfile,
               child: const CircleAvatar(
                 backgroundColor: Color(0xFF1565C0),
                 child: Icon(
@@ -133,9 +171,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 4),
 
-            const Text(
-              'Harshu',
-              style: TextStyle(
+            Text(
+              _dashboardName,
+              style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
@@ -332,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.card_travel,
-                    value: '2',
+                    value: _tripCount.toString(),
                     label: 'Trips',
                     color: Colors.blue,
                   ),
@@ -341,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.location_on,
-                    value: '4',
+                    value: _placeCount.toString(),
                     label: 'Places',
                     color: Colors.orange,
                   ),
@@ -350,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.public,
-                    value: '2',
+                    value: _countryCount.toString(),
                     label: 'Countries',
                     color: Colors.green,
                   ),

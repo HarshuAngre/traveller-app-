@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../core/services/destination_service.dart';
+import '../maps/maps_screen.dart';
 
 class DestinationsScreen extends StatefulWidget {
   const DestinationsScreen({super.key});
@@ -9,6 +14,8 @@ class DestinationsScreen extends StatefulWidget {
 
 class _DestinationsScreenState extends State<DestinationsScreen> {
   final TextEditingController searchController = TextEditingController();
+  final DestinationService _destinationService = DestinationService();
+  final Set<int> _favoriteOperations = {};
 
   String searchQuery = '';
   String selectedCategory = 'All';
@@ -89,6 +96,56 @@ class _DestinationsScreenState extends State<DestinationsScreen> {
     'City',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSavedDestinations());
+  }
+
+  Future<void> _loadSavedDestinations() async {
+    try {
+      final savedRows = await _destinationService.fetchSavedDestinations();
+      if (!mounted) return;
+
+      setState(() {
+        for (final destination in destinations) {
+          Map<String, dynamic>? matchingRow;
+          for (final row in savedRows) {
+            final sameName = (row['name'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase() ==
+                destination['name'].toString().trim().toLowerCase();
+            final sameCountry = (row['address'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase() ==
+                destination['country'].toString().trim().toLowerCase();
+            if (sameName && sameCountry) {
+              matchingRow = row;
+              break;
+            }
+          }
+
+          destination['favorite'] = matchingRow != null;
+          if (matchingRow != null) {
+            destination['savedId'] = matchingRow['id'].toString();
+          } else {
+            destination.remove('savedId');
+          }
+        }
+      });
+    } catch (error) {
+      debugPrint('Load saved destinations error: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load saved destinations. Please try again.'),
+        ),
+      );
+    }
+  }
+
   List<Map<String, dynamic>> get filteredDestinations {
     return destinations.where((destination) {
       final name = destination['name'].toString().toLowerCase();
@@ -104,11 +161,75 @@ class _DestinationsScreenState extends State<DestinationsScreen> {
     }).toList();
   }
 
-  void toggleFavorite(int index) {
+  Future<void> toggleFavorite(int index) async {
+    if (_favoriteOperations.contains(index)) return;
+
+    final destination = destinations[index];
+    final wasFavorite = destination['favorite'] as bool? ?? false;
+
     setState(() {
-      destinations[index]['favorite'] =
-          !(destinations[index]['favorite'] as bool);
+      _favoriteOperations.add(index);
     });
+
+    try {
+      if (wasFavorite) {
+        final savedId = destination['savedId']?.toString();
+        if (savedId == null || savedId.isEmpty) {
+          throw StateError('Saved destination record was not found.');
+        }
+
+        await _destinationService.removeSavedDestination(savedId);
+        if (!mounted) return;
+
+        setState(() {
+          destination['favorite'] = false;
+          destination.remove('savedId');
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${destination['name']} removed from favourites.',
+            ),
+          ),
+        );
+      } else {
+        final savedRow = await _destinationService.saveDestination(
+          name: destination['name'].toString(),
+          address: destination['country'].toString(),
+          category: destination['category'].toString(),
+          notes: destination['description'].toString(),
+        );
+        if (!mounted) return;
+
+        setState(() {
+          destination['favorite'] = true;
+          destination['savedId'] = savedRow['id'].toString();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${destination['name']} added to favourites.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      debugPrint('Toggle destination favourite error: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update favourites. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _favoriteOperations.remove(index);
+        });
+      }
+    }
   }
 
   void openDestination(Map<String, dynamic> destination) {
@@ -313,15 +434,21 @@ class _DestinationsScreenState extends State<DestinationsScreen> {
                       color: Colors.white.withValues(alpha: 0.9),
                       shape: const CircleBorder(),
                       child: IconButton(
-                        onPressed: () {
-                          toggleFavorite(originalIndex);
-                        },
-                        icon: Icon(
-                          isFavorite
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : Colors.grey,
-                        ),
+                        onPressed: _favoriteOperations.contains(originalIndex)
+                            ? null
+                            : () => toggleFavorite(originalIndex),
+                        icon: _favoriteOperations.contains(originalIndex)
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(
+                                isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: isFavorite ? Colors.red : Colors.grey,
+                              ),
                       ),
                     ),
                   ),
@@ -702,10 +829,12 @@ class DestinationDetailsScreen extends StatelessWidget {
               height: 52,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Google Maps integration coming soon!',
+                  final placeQuery =
+                      '${destination['name']}, ${destination['country']}';
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MapsScreen(
+                        initialPlaceQuery: placeQuery,
                       ),
                     ),
                   );
